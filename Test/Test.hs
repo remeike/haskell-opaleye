@@ -106,7 +106,7 @@ ways.
 
 twoIntTable :: String
             -> O.Table (Column O.PGInt4, Column O.PGInt4) (Column O.PGInt4, Column O.PGInt4)
-twoIntTable n = O.Table n (PP.p2 (O.required "column1", O.required "column2"))
+twoIntTable n = O.table n (PP.p2 (O.required "column1", O.required "column2"))
 
 table1 :: O.Table (Column O.PGInt4, Column O.PGInt4) (Column O.PGInt4, Column O.PGInt4)
 table1 = twoIntTable "table1"
@@ -126,23 +126,23 @@ table4 = twoIntTable "table4"
 
 table5 :: O.Table (Maybe (Column O.PGInt4), Maybe (Column  O.PGInt4))
                   (Column O.PGInt4, Column O.PGInt4)
-table5 = O.TableWithSchema "public" "table5" (PP.p2 (O.optional "column1", O.optional "column2"))
+table5 = O.tableWithSchema "public" "table5" (PP.p2 (O.optional "column1", O.optional "column2"))
 
 table6 :: O.Table (Column O.PGText, Column O.PGText) (Column O.PGText, Column O.PGText)
-table6 = O.Table "table6" (PP.p2 (O.required "column1", O.required "column2"))
+table6 = O.table "table6" (PP.p2 (O.required "column1", O.required "column2"))
 
-table7 :: O.Table (Column O.PGText, Column O.PGText) (Column O.PGText, Column O.PGText)
-table7 = O.Table "table7" (PP.p2 (O.required "column1", O.required "column2"))
+table7 ::O.Table (Column O.PGText, Column O.PGText) (Column O.PGText, Column O.PGText)
+table7 = O.table "table7" (PP.p2 (O.required "column1", O.required "column2"))
 
 table8 :: O.Table (Column O.PGJson) (Column O.PGJson)
-table8 = O.Table "table8" (O.required "column1")
+table8 = O.table "table8" (O.required "column1")
 
 table9 :: O.Table (Column O.PGJsonb) (Column O.PGJsonb)
-table9 = O.Table "table9" (O.required "column1")
+table9 = O.table "table9" (O.required "column1")
 
 tableKeywordColNames :: O.Table (Column O.PGInt4, Column O.PGInt4)
                                 (Column O.PGInt4, Column O.PGInt4)
-tableKeywordColNames = O.Table "keywordtable" (PP.p2 (O.required "column", O.required "where"))
+tableKeywordColNames = O.table "keywordtable" (PP.p2 (O.required "column", O.required "where"))
 
 table1Q :: Query (Column O.PGInt4, Column O.PGInt4)
 table1Q = O.queryTable table1
@@ -338,16 +338,16 @@ testExists :: Test
 testExists = it "restricts the rows returned with EXISTS" $ query `queryShouldReturnSorted` filter ((== 1) . fst) (L.sort table1data)
   where query = proc () -> do
           t <- table1Q -< ()
-          () <- O.exists (proc t -> do
-                            t' <- table1Q -< ()
-                            O.restrict -< fst t' .> fst t) -< t
+          () <- O.restrictExists (proc t -> do
+                                     t' <- table1Q -< ()
+                                     O.restrict -< fst t' .> fst t) -< t
           Arr.returnA -< t
 
 testNotExists :: Test
 testNotExists = it "restricts the rows returned with NOT EXISTS" $ query `queryShouldReturnSorted` filter ((== 2) . fst)  (L.sort table1data)
   where query = proc () -> do
           t <- table1Q -< ()
-          () <- O.notExists (proc t -> do
+          () <- O.restrictNotExists (proc t -> do
                                t' <- table1Q -< ()
                                O.restrict -< fst t' .> fst t) -< t
           Arr.returnA -< t
@@ -373,8 +373,10 @@ testDiv :: Test
 testDiv = it "" $ query `queryShouldReturnSorted` (map (op . toDoubles) table1data)
   where query :: Query (Column O.PGFloat8)
         query = proc () -> do
-          t <- Arr.arr (O.doubleOfInt *** O.doubleOfInt) <<< table1Q -< ()
-          Arr.returnA -< op t
+          (x', y') <- table1Q -< ()
+          let x = O.unsafeCast "float8" x'
+              y = O.unsafeCast "float8" y'
+          Arr.returnA -< op (x, y)
         op :: Fractional a => (a, a) -> a
         -- Choosing 0.5 here as it should be exactly representable in
         -- floating point
@@ -711,10 +713,12 @@ testKeywordColNames = it "" $ \conn -> do
 
 testInsertSerial :: Test
 testInsertSerial = it "" $ \conn -> do
-  _ <- O.runInsert conn table5 (Just 10, Just 20)
-  _ <- O.runInsert conn table5 (Just 30, Nothing)
-  _ <- O.runInsert conn table5 (Nothing, Nothing)
-  _ <- O.runInsert conn table5 (Nothing, Just 40)
+  let runInsert = O.runInsertMany conn table5 . return
+
+  _ <- runInsert (Just 10, Just 20)
+  _ <- runInsert (Just 30, Nothing)
+  _ <- runInsert (Nothing, Nothing)
+  _ <- runInsert (Nothing, Just 40)
 
   resultI <- O.runQuery conn (O.queryTable table5)
 
@@ -957,7 +961,7 @@ main = do
   dropAndCreateDB conn
 
   let insert (writeable, columndata) =
-        mapM_ (O.runInsert conn writeable) columndata
+        mapM_ (O.runInsertMany conn writeable) [columndata]
 
   mapM_ insert [ (table1, table1columndata)
                , (table2, table2columndata)

@@ -22,7 +22,7 @@ import qualified Control.Arrow as Arrow
 twoIntTable :: String
             -> O.Table (O.Column O.PGInt4, O.Column O.PGInt4)
                        (O.Column O.PGInt4, O.Column O.PGInt4)
-twoIntTable n = O.Table n (PP.p2 (O.required "column1", O.required "column2"))
+twoIntTable n = O.table n (PP.p2 (O.required "column1", O.required "column2"))
 
 table1 :: O.Table (O.Column O.PGInt4, O.Column O.PGInt4)
                   (O.Column O.PGInt4, O.Column O.PGInt4)
@@ -62,7 +62,7 @@ unpackColumns = eitherPP
 
 instance Show ArbitraryQuery where
   show (ArbitraryQuery q) = maybe "Empty query" id
-                              (O.showSqlForPostgresExplicit unpackColumns q)
+                              (O.showSqlExplicit unpackColumns q)
 
 instance Show ArbitraryGarble where
   show = const "A permutation"

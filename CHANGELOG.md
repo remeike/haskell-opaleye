@@ -1,3 +1,21 @@
+## 0.7.0.0
+
+* Removed deprecated functionality
+
+  * `runInsert`, `runInsertReturning`, `showPGType`, `literalColumn`,
+    `unsafePgFormatTime`, `showSqlForPostgres`,
+    `showSqlForPostgresUnopt`, `showSqlForPostgresExplicit`,
+    `showSqlForPostgresUnoptExplicit`, `formatAndShowSQL`,
+    `prepareQuery`, `Show` instance of `Column`, `View`, `Writer`,
+    `Table` (in favour of `table`), `TableWithSchema` (in favour of
+    `tableWithSchema`)
+
+* Deprecated
+
+  * `tableProperties`, `exists`, `notExists`
+
+## HEAD
+
 * Added `leftJoinA`
 
 ## 0.6.1.0
