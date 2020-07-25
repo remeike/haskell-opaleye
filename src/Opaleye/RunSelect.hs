@@ -1,6 +1,11 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Opaleye.RunSelect
   (module Opaleye.RunSelect,
@@ -15,6 +20,8 @@ module Opaleye.RunSelect
    IRQ.fromPGSFieldParser) where
 
 import qualified Data.Profunctor            as P
+import qualified Data.Profunctor.Product    as PP
+import qualified Data.Profunctor.Product.TH as PPTH
 import qualified Database.PostgreSQL.Simple as PGS
 
 import qualified Opaleye.Column as C
@@ -25,6 +32,9 @@ import           Opaleye.Internal.RunQuery (FromFields)
 import qualified Opaleye.Internal.RunQuery as IRQ
 
 import qualified Data.Profunctor.Product.Default as D
+
+import qualified Opaleye.SqlTypes as T
+import           Opaleye.Constant
 
 -- * Running 'S.Select's
 
@@ -160,3 +170,45 @@ declareCursorExplicit
     -> S.Select fields
     -> IO (IRQ.Cursor haskells)
 declareCursorExplicit = RQ.declareCursorExplicit
+
+
+newtype Wrap p a b = Wrap { unWrap :: p a b }
+
+instance P.Profunctor p => P.Profunctor (Wrap p) where
+  dimap f g = Wrap . P.dimap f g . unWrap
+
+instance PP.ProductProfunctor p => PP.ProductProfunctor (Wrap p) where
+  purePP = Wrap . PP.purePP
+  f **** g = Wrap (unWrap f PP.**** unWrap g)
+
+class Infer a b | a -> b
+
+instance String ~ a => D.Default (Wrap FromFields) (C.Column T.SqlText) a where
+  def = Wrap D.def
+
+instance Int ~ a => D.Default (Wrap FromFields) (C.Column T.SqlInt4) a where
+  def = Wrap D.def
+
+instance C.Column T.SqlText ~ a => D.Default (Wrap ToFields) String a where
+  def = Wrap D.def
+
+instance C.Column T.SqlInt4 ~ a => D.Default (Wrap ToFields) Int a where
+  def = Wrap D.def
+
+data Pair a b = Pair a b deriving Show
+
+$(PPTH.makeAdaptorAndInstanceInferrable "pPair" ''Pair)
+
+runSelectI :: (D.Default (Wrap FromFields) fields haskells)
+           => PGS.Connection
+           -- ^
+           -> S.Select fields
+           -- ^
+           -> IO [haskells]
+runSelectI = RQ.runQueryExplicit (unWrap D.def)
+
+toFieldsI :: (D.Default (Wrap ToFields) haskells fields)
+          => haskells
+          -- ^
+          -> fields
+toFieldsI = constantExplicit (unWrap D.def)
