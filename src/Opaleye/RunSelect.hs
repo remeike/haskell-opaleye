@@ -183,42 +183,53 @@ instance PP.ProductProfunctor p => PP.ProductProfunctor (Wrap p) where
   purePP = Wrap . PP.purePP
   f **** g = Wrap (unWrap f PP.**** unWrap g)
 
-class Infer a b | a -> b
 
-instance String ~ a => D.Default (Wrap FromFields) (C.Column T.SqlText) a where
-  def = Wrap D.def
+class DefaultWrapFromField a b | a -> b where
+  defaultWrapFromField :: FromFields (C.Column a) b
 
-instance Int ~ a => D.Default (Wrap FromFields) (C.Column T.SqlInt4) a where
-  def = Wrap D.def
+instance (i ~ C.Column j, DefaultWrapFromField j a)
+  => D.Default (Wrap FromFields) (C.Column j) a where
+  def = Wrap defaultWrapFromField
 
-instance C.Column T.SqlText ~ a => D.Default (Wrap ToFields) String a where
-  def = Wrap D.def
+instance DefaultWrapFromField T.SqlText String where
+  defaultWrapFromField = D.def
 
-instance C.Column T.SqlInt4 ~ a => D.Default (Wrap ToFields) Int a where
-  def = Wrap D.def
+instance DefaultWrapFromField T.SqlInt4 Int where
+  defaultWrapFromField = D.def
+
+instance DefaultWrapFromField T.SqlFloat8 Double where
+  defaultWrapFromField = D.def
+
+
+class DefaultWrapToField a b | a -> b where
+  defaultWrapToField :: ToFields a b
+
+instance a ~ C.Column T.SqlText => DefaultWrapToField String a where
+  defaultWrapToField = D.def
+
+instance a ~ C.Column T.SqlInt4 => DefaultWrapToField Int a where
+  defaultWrapToField = D.def
+
+instance a ~ C.Column T.SqlFloat8 => DefaultWrapToField Double a where
+  defaultWrapToField = D.def
+
+--instance {-# INCOHERENT #-} (DefaultWrapToField i z, i ~ ())
+--  => D.Default (Wrap ToFields) i z where
+--  def = Wrap defaultWrapToField
+
+instance b ~ C.Column T.SqlText => D.Default (Wrap ToFields) String b where
+  def = Wrap defaultWrapToField
+
+instance b ~ C.Column T.SqlInt4 => D.Default (Wrap ToFields) Int b where
+  def = Wrap defaultWrapToField
+
+instance b ~ C.Column T.SqlFloat8 => D.Default (Wrap ToFields) Double b where
+  def = Wrap defaultWrapToField
 
 instance (maybe_b ~ Maybe b, PP.Default (Wrap RQ.FromFields) a b)
   => PP.Default (Wrap RQ.QueryRunner) (MaybeFields a) maybe_b where
   def = Wrap (fromFieldsMaybeFields (unWrap PP.def))
-data Pair a b = Pair a b deriving Show
 
-$(PPTH.makeAdaptorAndInstanceInferrable "pPair" ''Pair)
-
-data Unit = Unit deriving Show
-
-instance Semigroup Unit where
-  (<>) = \_ _ -> Unit
-
-instance Monoid Unit where
-  mempty = Unit
-
-instance {-# INCOHERENT #-} (unit ~ Unit, PP.ProductProfunctor p)
-  => D.Default p Unit unit where
-  def = PP.purePP Unit
-
-instance {-# INCOHERENT #-} (unit ~ Unit, PP.ProductProfunctor p)
-  => D.Default p unit Unit where
-  def = PP.purePP Unit
 
 runSelectI :: (D.Default (Wrap FromFields) fields haskells)
            => PGS.Connection
