@@ -2,7 +2,10 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE Arrows #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Opaleye.Internal.MaybeFields where
 
@@ -308,3 +311,7 @@ instance (P.Profunctor p, IsSqlType a, PP.Default p (IC.Column a) (IC.Column a))
 instance PP.Default (WithNulls B.Binaryspec) a b
   => PP.Default B.Binaryspec (MaybeFields a) (MaybeFields b) where
   def = binaryspecMaybeFields PP.def
+
+instance (maybe_b ~ Maybe b, PP.Default RQ.FromFields a b)
+  => PP.Default RQ.QueryRunner (MaybeFields a) maybe_b where
+  def = fromFieldsMaybeFields PP.def

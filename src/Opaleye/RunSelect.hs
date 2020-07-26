@@ -32,9 +32,11 @@ import           Opaleye.Internal.RunQuery (FromFields)
 import qualified Opaleye.Internal.RunQuery as IRQ
 
 import qualified Data.Profunctor.Product.Default as D
+import qualified Data.Profunctor.Product.Default as PP
 
 import qualified Opaleye.SqlTypes as T
 import           Opaleye.Constant
+import           Opaleye.Internal.MaybeFields
 
 -- * Running 'S.Select's
 
@@ -195,9 +197,28 @@ instance C.Column T.SqlText ~ a => D.Default (Wrap ToFields) String a where
 instance C.Column T.SqlInt4 ~ a => D.Default (Wrap ToFields) Int a where
   def = Wrap D.def
 
+instance (maybe_b ~ Maybe b, PP.Default (Wrap RQ.FromFields) a b)
+  => PP.Default (Wrap RQ.QueryRunner) (MaybeFields a) maybe_b where
+  def = Wrap (fromFieldsMaybeFields (unWrap PP.def))
 data Pair a b = Pair a b deriving Show
 
 $(PPTH.makeAdaptorAndInstanceInferrable "pPair" ''Pair)
+
+data Unit = Unit deriving Show
+
+instance Semigroup Unit where
+  (<>) = \_ _ -> Unit
+
+instance Monoid Unit where
+  mempty = Unit
+
+instance {-# INCOHERENT #-} (unit ~ Unit, PP.ProductProfunctor p)
+  => D.Default p Unit unit where
+  def = PP.purePP Unit
+
+instance {-# INCOHERENT #-} (unit ~ Unit, PP.ProductProfunctor p)
+  => D.Default p unit Unit where
+  def = PP.purePP Unit
 
 runSelectI :: (D.Default (Wrap FromFields) fields haskells)
            => PGS.Connection
