@@ -146,6 +146,8 @@ test-suite tutorial
   main-is: Main.hs
   other-modules: TutorialAdvanced,
                  TutorialBasic,
+                 TutorialCool,
+                 TutorialCoolRunner,
                  TutorialManipulation,
                  TutorialBasicMonomorphic,
                  TutorialBasicTypeFamilies,
@@ -156,6 +158,7 @@ test-suite tutorial
     postgresql-simple,
     profunctors,
     product-profunctors >= 0.6,
+    tmp-postgres==1.34.1.0,
     time,
     opaleye
   ghc-options: -Wall

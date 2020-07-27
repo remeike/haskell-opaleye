@@ -842,11 +842,6 @@ We could run the query `selectTable goodWarehouseTable` like this.
 
 > type WarehouseId = WarehouseId' Int
 > type GoodWarehouse = Warehouse' WarehouseId String Int
->
-> runWarehouseSelect :: PGS.Connection
->                   -> Select GoodWarehouseField
->                   -> IO _
-> runWarehouseSelect = runSelectI
 
 
 Conclusion
