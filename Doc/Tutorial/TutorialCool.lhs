@@ -11,7 +11,7 @@
 >
 > module TutorialCool where
 >
-> import           Opaleye ((.===), (.++))
+> import           Opaleye ((.===), (.++), (.<))
 > import qualified Opaleye as O
 > import qualified Opaleye.Join as J
 > import qualified Database.PostgreSQL.Simple as PGS
@@ -123,6 +123,122 @@
 >   avg' <- O.laterally (O.aggregate O.avg) (fmap snd s)
 >   str' <- O.laterally (O.aggregate (O.stringAgg (O.sqlString ","))) (fmap fst s)
 >   pure (k, sum', avg', str')
+>
+> author_table = O.values (map O.toFieldsI (
+>   [ (0 :: Int, "Simon", "Peyton Jones")
+>   , (1, "Simon", "Marlow")
+>   , (2, "Richard", "Eisenberg")
+>   , (3, "Edward", "Kmett")
+>   , (4, "Andrey", "Mokhov")
+>   , (5, "Joachim", "Breitner")
+>   , (6, "Stephanie", "Weirich")
+>   , (7, "Judith", "Borghouts")
+>   , (8, "Matt", "McCutchen")
+>   , (9, "Andy", "Gordon")
+>   , (10, "Advait", "Sarkar")
+>   , (11, "Sigbjorn", "Finne")
+>   ]))
+>
+> paper_table = O.values (map O.toFieldsI (
+>   [ (0 :: Int, "Making a fast curry", 2004 :: Int)
+>   , (1, "Levity polymorphism", 2017)
+>   , (2, "Desugaring Haskell's do-notation Into Applicative Operations", 2016)
+>   , (3, "Safe zero-cost coercions for Haskell", 2016)
+>   , (4, "Elastic Sheet-Defined Functions", 2020)
+>   , (5, "Concurrent Haskell", 1996)
+>   ]))
+>
+> paper_author = O.values (map O.toFields (
+>   [ (0 :: Int, 0 :: Int)
+>   , (0, 1)
+>   , (1, 0)
+>   , (1, 1)
+>   , (2, 0)
+>   , (2, 1)
+>   , (2, 3)
+>   , (2, 4)
+>   , (3, 0)
+>   , (3, 2)
+>   , (3, 5)
+>   , (3, 6)
+>   , (4, 0)
+>   , (4, 7)
+>   , (4, 8)
+>   , (4, 9)
+>   , (4, 10)
+>   , (5, 0)
+>   , (5, 9)
+>   , (5, 11)
+>   ]))
+>
+> sameNamePapers = do
+>   (paperId, paperName, _) <- paper_table
+>   (author1Id, author1FirstName, author1Surname) <- author_table
+>   (author2Id, author2FirstName, author2Surname) <- author_table
+>   (paperId1', author1Id') <- paper_author
+>   (paperId2', author2Id') <- paper_author
+>
+>   O.viaLateral O.restrict (paperId .=== paperId1')
+>   O.viaLateral O.restrict (paperId .=== paperId2')
+>   O.viaLateral O.restrict (author1Id' .=== author1Id)
+>   O.viaLateral O.restrict (author2Id' .=== author2Id)
+>
+>   O.viaLateral O.restrict (author1Id .< author2Id)
+>   O.viaLateral O.restrict (author1FirstName .=== author2FirstName)
+>
+>   let jointFirstName = author1FirstName
+>
+>   return (jointFirstName .++ O.sqlString "s "
+>           .++ author1Surname
+>           .++ O.sqlString " and "
+>           .++ author2Surname
+>           .++ O.sqlString " collaborated on "
+>           .++ paperName)
+>
+> paperGaps = do
+>   (paperEarlierId, paperEarlierName, paperEarlierYear) <- paper_table
+>   (paperLaterId,   paperLaterName,   paperLaterYear)   <- paper_table
+>
+>   (author1Id, author1FirstName, author1Surname) <- author_table
+>   (author2Id, author2FirstName, author2Surname) <- author_table
+>
+>   (paperEarlierId1, authorEarlierId1) <- paper_author
+>   (paperEarlierId2, authorEarlierId2) <- paper_author
+>   (paperLaterId1,   authorLaterId1) <- paper_author
+>   (paperLaterId2,   authorLaterId2) <- paper_author
+>
+>   O.viaLateral O.restrict (paperEarlierId .=== paperEarlierId1)
+>   O.viaLateral O.restrict (paperEarlierId .=== paperEarlierId2)
+>   O.viaLateral O.restrict (paperLaterId .=== paperLaterId1)
+>   O.viaLateral O.restrict (paperLaterId .=== paperLaterId2)
+>
+>   O.viaLateral O.restrict (author1Id .=== authorEarlierId1)
+>   O.viaLateral O.restrict (author1Id .=== authorLaterId1)
+>
+>   O.viaLateral O.restrict (author2Id .=== authorEarlierId2)
+>   O.viaLateral O.restrict (author2Id .=== authorLaterId2)
+>
+>   O.viaLateral O.restrict (author1Id .< author2Id)
+>   O.viaLateral O.restrict (paperEarlierYear .< paperLaterYear)
+>
+>   pure (author1FirstName .++ O.sqlString " " .++ author1Surname
+>         .++ O.sqlString " and "
+>         .++ author2FirstName .++ O.sqlString " " .++ author2Surname
+>         .++ O.sqlString " collaborated on "
+>         .++ paperEarlierName .++ O.sqlString " and " .++ paperLaterName
+>         .++ O.sqlString " separated by "
+>         .++ years (paperLaterYear - paperEarlierYear))
+>
+>   where years n = O.unsafeCast "text" n .++ O.sqlString " "
+>                   .++ O.ifThenElse (n .=== 1)
+>                                    (O.sqlString "year")
+>                                    (O.sqlString "years")
+>
+>
+>
+>
+>
+>
 >
 > --run
 > -- :: (Default (O.Wrap O.FromFields) fields a, Show a)
