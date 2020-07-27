@@ -234,11 +234,64 @@
 >                                    (O.sqlString "year")
 >                                    (O.sqlString "years")
 >
+> authorsOf paperId = do
+>   author@(authorId, _, _) <- author_table
+>   (paperId', authorId') <- paper_author
+>   O.viaLateral O.restrict (authorId .=== authorId')
+>   O.viaLateral O.restrict (paperId .=== paperId')
 >
+>   pure author
 >
+> collaborators = do
+>   paper@(paperId, _, _) <- paper_table
+>   author1@(author1Id, _, _) <- authorsOf paperId
+>   author2@(author2Id, _, _) <- authorsOf paperId
 >
+>   O.viaLateral O.restrict (author1Id .< author2Id)
 >
+>   pure (paper, author1, author2)
 >
+> sameNamePapersSimpler = do
+>   ((_, paperName, _),
+>    (_, author1FirstName, author1Surname),
+>    (_, author2FirstName, author2Surname)) <- collaborators
+
+>   O.viaLateral O.restrict (author1FirstName .=== author2FirstName)
+>
+>   let jointFirstName = author1FirstName
+>
+>   return (jointFirstName .++ O.sqlString "s "
+>           .++ author1Surname
+>           .++ O.sqlString " and "
+>           .++ author2Surname
+>           .++ O.sqlString " collaborated on "
+>           .++ paperName)
+>
+> paperGapsSimpler = do
+>   ((_, paperEarlierName, paperEarlierYear),
+>    (author1Id, author1FirstName, author1Surname),
+>    (author2Id, author2FirstName, author2Surname)) <- collaborators
+>
+>   ((_, paperLaterName, paperLaterYear),
+>    (author1Id', _, _),
+>    (author2Id', _, _)) <- collaborators
+>
+>   O.viaLateral O.restrict (author1Id .=== author1Id')
+>   O.viaLateral O.restrict (author2Id .=== author2Id')
+>   O.viaLateral O.restrict (paperEarlierYear .< paperLaterYear)
+>
+>   pure (author1FirstName .++ O.sqlString " " .++ author1Surname
+>         .++ O.sqlString " and "
+>         .++ author2FirstName .++ O.sqlString " " .++ author2Surname
+>         .++ O.sqlString " collaborated on "
+>         .++ paperEarlierName .++ O.sqlString " and " .++ paperLaterName
+>         .++ O.sqlString " separated by "
+>         .++ years (paperLaterYear - paperEarlierYear))
+>
+>   where years n = O.unsafeCast "text" n .++ O.sqlString " "
+>                   .++ O.ifThenElse (n .=== 1)
+>                                    (O.sqlString "year")
+>                                    (O.sqlString "years")
 >
 > --run
 > -- :: (Default (O.Wrap O.FromFields) fields a, Show a)
