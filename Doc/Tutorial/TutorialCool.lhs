@@ -16,6 +16,7 @@
 > import qualified Opaleye.Join as J
 > import qualified Database.PostgreSQL.Simple as PGS
 > import Database.Postgres.Temp
+> import Data.Profunctor as P
 > import Data.Profunctor.Product.Default
 > import Data.Profunctor.Product.TH
 >
@@ -148,7 +149,7 @@
 >   , (5, "Concurrent Haskell", 1996)
 >   ]))
 >
-> paper_author = O.values (map O.toFields (
+> paper_author = O.values (map O.toFieldsI (
 >   [ (0 :: Int, 0 :: Int)
 >   , (0, 1)
 >   , (1, 0)
@@ -170,6 +171,19 @@
 >   , (5, 9)
 >   , (5, 11)
 >   ]))
+>
+> authorPaperCount = do
+>   (authorId, authorFirstName, authorSurname) <- author_table
+>   (paperCount, authorId') <-
+>       O.aggregate ((,) <$> P.lmap fst O.count <*> P.lmap snd O.groupBy)
+>                   paper_author
+>
+>   O.viaLateral O.restrict (authorId .=== authorId')
+>
+>   pure (authorFirstName .++ O.sqlString " " .++ authorSurname
+>        .++ O.sqlString " has "
+>        .++ pluralise paperCount (O.sqlString "paper")
+>        .++ O.sqlString " in the database")
 >
 > sameNamePapers = do
 >   (paperId, paperName, _) <- paper_table
@@ -229,10 +243,13 @@
 >         .++ O.sqlString " separated by "
 >         .++ years (paperLaterYear - paperEarlierYear))
 >
->   where years n = O.unsafeCast "text" n .++ O.sqlString " "
->                   .++ O.ifThenElse (n .=== 1)
->                                    (O.sqlString "year")
->                                    (O.sqlString "years")
+>   where years n = pluralise n (O.sqlString "year")
+>
+> pluralise n noun =
+>   O.unsafeCast "text" n .++ O.sqlString " " .++ noun
+>   .++ (O.ifThenElse (n .=== 1)
+>                     (O.sqlString "")
+>                     (O.sqlString "s"))
 >
 > authorsOf paperId = do
 >   author@(authorId, _, _) <- author_table
@@ -288,10 +305,7 @@
 >         .++ O.sqlString " separated by "
 >         .++ years (paperLaterYear - paperEarlierYear))
 >
->   where years n = O.unsafeCast "text" n .++ O.sqlString " "
->                   .++ O.ifThenElse (n .=== 1)
->                                    (O.sqlString "year")
->                                    (O.sqlString "years")
+>   where years n = pluralise n (O.sqlString "year")
 >
 > --run
 > -- :: (Default (O.Wrap O.FromFields) fields a, Show a)
