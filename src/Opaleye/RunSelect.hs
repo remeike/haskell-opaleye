@@ -38,6 +38,8 @@ import qualified Opaleye.SqlTypes as T
 import           Opaleye.Constant
 import           Opaleye.Internal.MaybeFields
 
+import qualified GHC.Int
+
 -- * Running 'S.Select's
 
 -- | @runSelect@'s use of the @'D.Default' 'FromFields'@
@@ -197,6 +199,9 @@ instance DefaultWrapFromField T.SqlText String where
 instance DefaultWrapFromField T.SqlInt4 Int where
   defaultWrapFromField = D.def
 
+instance DefaultWrapFromField T.SqlInt8 GHC.Int.Int64 where
+  defaultWrapFromField = D.def
+
 instance DefaultWrapFromField T.SqlFloat8 Double where
   defaultWrapFromField = D.def
 
@@ -208,6 +213,9 @@ instance a ~ C.Column T.SqlText => DefaultWrapToField String a where
   defaultWrapToField = D.def
 
 instance a ~ C.Column T.SqlInt4 => DefaultWrapToField Int a where
+  defaultWrapToField = D.def
+
+instance a ~ C.Column T.SqlInt8 => DefaultWrapToField GHC.Int.Int64 a where
   defaultWrapToField = D.def
 
 instance a ~ C.Column T.SqlFloat8 => DefaultWrapToField Double a where
